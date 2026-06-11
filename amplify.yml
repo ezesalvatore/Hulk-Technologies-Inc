@@ -3,7 +3,16 @@ frontend:
   phases:
     build:
       commands:
-        - node generate-config.js
+        - |
+          cat > config.js << EOF
+          window.APP_CONFIG = {
+            cognitoDomain:    "$COGNITO_DOMAIN",
+            clientId:         "$CLIENT_ID",
+            redirectUri:      "$REDIRECT_URI",
+            listEquipmentUrl: "$LIST_EQUIPMENT_URL",
+            reserveUrl:       "$RESERVE_URL"
+          };
+          EOF
   artifacts:
     baseDirectory: .
     files:
