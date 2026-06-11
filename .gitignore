@@ -1,7 +1,4 @@
 # Environment variables — never commit
 .env
- 
-# Generated at build time by amplify.yml (or manually from config.example.js locally)
-# Never commit — it contains environment-specific values
-config.js
+
  
