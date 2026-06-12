@@ -105,29 +105,30 @@ async function reserve(equipmentId, btn) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        equipmentId: equipmentId,
-        customerName: 'Ari'
+        equipmentId: equipmentId
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
     const result = await response.json();
 
-    console.log('Reservation created:', result);
+    console.log(result);
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Reservation failed');
+    }
 
     btn.classList.add('queued');
     btn.textContent = 'Reserved ✓';
 
+    alert('Reservation successful');
+
   } catch (err) {
 
-    console.error('reserve error:', err);
+    console.error(err);
 
     btn.disabled = false;
     btn.textContent = 'Reserve';
 
-    alert('Reservation failed');
+    alert(err.message);
   }
 }
