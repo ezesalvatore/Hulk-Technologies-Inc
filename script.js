@@ -93,23 +93,41 @@ function showCategories() {
 }
 
 async function reserve(equipmentId, btn) {
-  btn.disabled    = true;
+
+  btn.disabled = true;
   btn.textContent = 'Reserving...';
 
   try {
-    // TODO: wire up when endpoint is ready
-    // const res = await fetch(RESERVE_URL, {
-    //   method:  'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body:    JSON.stringify({ equipmentId })
-    // });
-    // if (!res.ok) throw new Error(`Reserve failed (${res.status})`);
+
+    const response = await fetch(RESERVE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        equipmentId: equipmentId,
+        customerName: 'Ari'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    console.log('Reservation created:', result);
 
     btn.classList.add('queued');
-    btn.textContent = 'Queued ✓';
+    btn.textContent = 'Reserved ✓';
+
   } catch (err) {
+
     console.error('reserve error:', err);
-    btn.disabled    = false;
+
+    btn.disabled = false;
     btn.textContent = 'Reserve';
+
+    alert('Reservation failed');
   }
 }
