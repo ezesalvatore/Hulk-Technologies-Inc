@@ -1,115 +1,191 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hulk Technologies International — Technology on Demand</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
+// ─── Config ──────────────────────────────────────────────────────────────────
+// Values come from config.js, which is generated at build time (Amplify)
+// or copied from config.example.js for local development.
 
-<header>
-  <div class="wrap">
+console.log('[auth.js] ▶ script loaded');
+console.log('[auth.js] window.APP_CONFIG =', window.APP_CONFIG);
 
-    <!-- Top bar: greeting + sign out -->
-    <div class="header-bar fade d1">
-      <!-- 👇 auth.js writes the user's name into .greet span -->
-      <div class="greet">Welcome back, <span>there</span> — your fleet is ready to deploy.</div>
-      <button class="signout-btn" onclick="signOut()">Sign out</button>
-    </div>
+if (!window.APP_CONFIG) {
+  console.error('[auth.js] ✗ window.APP_CONFIG is undefined — config.js may not have loaded');
+  throw new Error('[auth.js] APP_CONFIG not defined');
+}
 
-    <h1 class="fade d2">Technology, <span class="em">on demand.</span></h1>
-    <p class="sub fade d3">Request, reserve, and manage enterprise technology resources through a secure, scalable, serverless cloud platform. Local logistics — global reach.</p>
+const { cognitoDomain, clientId, redirectUri } = window.APP_CONFIG;
 
-  </div> <!-- /.wrap — FIX: this was missing, causing layout breakage -->
-</header>
+console.log('[auth.js] Config values:', {
+  cognitoDomain: cognitoDomain || '✗ MISSING',
+  clientId:      clientId      || '✗ MISSING',
+  redirectUri:   redirectUri   || '✗ MISSING',
+});
 
-<section id="catalog">
-  <div class="wrap">
-    <div id="catalogGrid">
-      <div class="sec-head">
-        <span class="kicker">Technology &amp; IT Equipment</span>
-        <h2>Choose a category</h2>
-        <p>Click any category to browse available models and reserve.</p>
-      </div>
-      <div class="grid">
+const TOKEN_KEY = 'hti_id_token';
 
-        <div class="card fade d1">
-          <h3>Laptops</h3>
-          <p class="desc">Portable workstations for hybrid teams, events, and short-term deployments.</p>
-          <button class="view-btn" onclick="openCategory('laptops')">View list &rarr;</button>
-        </div>
+// ─── JWT Helpers ─────────────────────────────────────────────────────────────
+function decodeJwt(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch (e) {
+    console.error('[auth.js] ✗ decodeJwt failed — token may be malformed:', e);
+    return null;
+  }
+}
 
-        <div class="card fade d2">
-          <h3>Desktop Workstations</h3>
-          <p class="desc">High-performance towers for engineering, design, and compute-heavy work.</p>
-          <button class="view-btn" onclick="openCategory('desktops')">View list &rarr;</button>
-        </div>
+function isTokenExpired(claims) {
+  const expMs   = claims.exp * 1000;
+  const nowMs   = Date.now();
+  const expired = expMs < nowMs;
+  console.log('[auth.js] Token expiry check:', {
+    exp:        new Date(expMs).toISOString(),
+    now:        new Date(nowMs).toISOString(),
+    isExpired:  expired,
+  });
+  return expired;
+}
 
-        <div class="card fade d3">
-          <h3>Monitors</h3>
-          <p class="desc">4K and ultrawide displays to extend any workspace at a moment's notice.</p>
-          <button class="view-btn" onclick="openCategory('monitors')">View list &rarr;</button>
-        </div>
+// ─── Session Storage ─────────────────────────────────────────────────────────
+function getStoredToken()  { return sessionStorage.getItem(TOKEN_KEY); }
+function storeToken(token) { sessionStorage.setItem(TOKEN_KEY, token); }
+function clearToken()      { sessionStorage.removeItem(TOKEN_KEY); }
 
-        <div class="card fade d4">
-          <h3>Network Switches</h3>
-          <p class="desc">Managed switching to stand up secure, high-throughput infrastructure fast.</p>
-          <button class="view-btn" onclick="openCategory('switches')">View list &rarr;</button>
-        </div>
+// ─── Cognito Hosted UI ───────────────────────────────────────────────────────
+function redirectToLogin() {
+  const url = new URL(`https://${cognitoDomain}/login`);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('redirect_uri', redirectUri);
+  console.warn('[auth.js] ➜ Redirecting to Cognito login:', url.toString());
+  window.location.href = url.toString();
+}
 
-        <div class="card fade d5">
-          <h3>AV Equipment</h3>
-          <p class="desc">Projectors, speakers, and conferencing kits for events and boardrooms.</p>
-          <button class="view-btn" onclick="openCategory('av')">View list &rarr;</button>
-        </div>
+// ─── Sign Out ────────────────────────────────────────────────────────────────
+function signOut() {
+  console.log('[auth.js] signOut() called — clearing token and redirecting to Cognito logout');
+  clearToken();
+  const url = new URL(`https://${cognitoDomain}/logout`);
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('logout_uri', redirectUri);
+  console.warn('[auth.js] ➜ Redirecting to logout URL:', url.toString());
+  window.location.href = url.toString();
+}
 
-      </div>
-    </div>
+// ─── Authorization Code Exchange ─────────────────────────────────────────────
+async function exchangeCodeForTokens(code) {
+  console.log('[auth.js] exchangeCodeForTokens() — exchanging code for tokens...');
 
-    <div id="listView">
-      <button class="back" onclick="showCategories()">&larr; BACK TO CATEGORIES</button>
-      <h2 class="list-title" id="listTitle"></h2>
-      <p class="list-meta" id="listMeta"></p>
-      <div class="rows" id="rows"></div>
-    </div>
-  </div>
-</section>
+  const tokenEndpoint = `https://${cognitoDomain}/oauth2/token`;
+  console.log('[auth.js] Token endpoint:', tokenEndpoint);
+  console.log('[auth.js] Params:', { client_id: clientId, redirect_uri: redirectUri });
 
-<section id="mission" style="padding-top:20px">
-  <div class="wrap">
-    <div class="mission">
-      <span class="kicker">Our Mission</span>
-      <blockquote>Technology on demand — turning a local business into a <em>global service provider.</em></blockquote>
-      <p class="full">Hulk Technologies International is a cloud-native technology equipment rental platform that enables businesses to request, reserve, and manage technology resources through a secure, scalable, serverless AWS infrastructure. Our mission is to provide technology on demand while leveraging cloud computing to transform a local business into a global service provider.</p>
-    </div>
-  </div>
-</section>
+  const res = await fetch(tokenEndpoint, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type:   'authorization_code',
+      client_id:    clientId,
+      redirect_uri: redirectUri,
+      code
+    })
+  });
 
-<footer>
-  <div class="wrap foot-in">
-    <a class="brand" href="#"><span class="mark">H</span>
-      <span><b>HULK TECHNOLOGIES</b><span class="intl">INTERNATIONAL</span></span></a>
-    <div class="badges">
-      <span class="badge">SECURE</span><span class="badge">SCALABLE</span>
-      <span class="badge">SERVERLESS</span><span class="badge">CLOUD-NATIVE</span>
-    </div>
-    <p class="copy">© 2026 Hulk Technologies International — Technology on demand, anywhere.</p>
-  </div>
-</footer>
+  if (!res.ok) {
+    const err = await res.text();
+    console.error('[auth.js] ✗ Token exchange failed:', res.status, err);
+    throw new Error(`Token exchange failed (${res.status}): ${err}`);
+  }
 
-<!--
-  SCRIPT LOAD ORDER — do not change:
-  1. config.js   → sets window.APP_CONFIG (generated by amplify.yml at build time)
-  2. auth.js     → reads APP_CONFIG, handles Cognito login/token exchange, exposes signOut()
-  3. script.js   → reads APP_CONFIG for API URLs, calls openCategory() / reserve()
--->
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="script.js"></script>
+  const data = await res.json();
+  console.log('[auth.js] ✓ Token exchange succeeded. Keys returned:', Object.keys(data));
 
-</body>
-</html>
+  if (!data.id_token) {
+    console.error('[auth.js] ✗ No id_token in response — got:', data);
+    throw new Error('No id_token returned from Cognito');
+  }
+
+  storeToken(data.id_token);
+  console.log('[auth.js] ✓ id_token stored in sessionStorage');
+
+  // Remove ?code=... from the URL bar without triggering a reload
+  window.history.replaceState({}, '', window.location.pathname);
+  console.log('[auth.js] ✓ ?code= removed from URL bar');
+
+  return data.id_token;
+}
+
+// ─── Bootstrap ───────────────────────────────────────────────────────────────
+(async () => {
+  console.log('[auth.js] ▶ Bootstrap starting...');
+  console.log('[auth.js] Current URL:', window.location.href);
+
+  try {
+    let token;
+
+    const params = new URLSearchParams(window.location.search);
+    const code   = params.get('code');
+
+    if (code) {
+      console.log('[auth.js] ✓ ?code= found in URL — starting token exchange');
+      token = await exchangeCodeForTokens(code);
+    } else {
+      console.log('[auth.js] No ?code= in URL — checking sessionStorage for existing token');
+      token = getStoredToken();
+
+      if (token) {
+        console.log('[auth.js] ✓ Found stored token in sessionStorage');
+      } else {
+        console.warn('[auth.js] ✗ No stored token found');
+      }
+    }
+
+    if (!token) {
+      console.warn('[auth.js] No token available — redirecting to login');
+      redirectToLogin();
+      return;
+    }
+
+    const claims = decodeJwt(token);
+
+    if (!claims) {
+      console.error('[auth.js] ✗ Failed to decode token — clearing and redirecting to login');
+      clearToken();
+      redirectToLogin();
+      return;
+    }
+
+    console.log('[auth.js] Token claims:', {
+      sub:        claims.sub,
+      email:      claims.email,
+      given_name: claims.given_name,
+      exp:        new Date(claims.exp * 1000).toISOString(),
+      iss:        claims.iss,
+      aud:        claims.aud,
+    });
+
+    if (isTokenExpired(claims)) {
+      console.warn('[auth.js] ✗ Token is expired — clearing and redirecting to login');
+      clearToken();
+      redirectToLogin();
+      return;
+    }
+
+    console.log('[auth.js] ✓ Token is valid and not expired');
+
+    const name = claims.given_name || claims.name || claims.email || 'there';
+    console.log('[auth.js] Greeting user as:', name);
+
+    const greetSpan = document.querySelector('.greet span');
+    if (greetSpan) {
+      greetSpan.textContent = name;
+      console.log('[auth.js] ✓ Greeting span updated');
+    } else {
+      console.warn('[auth.js] ✗ .greet span not found in DOM — greeting not updated');
+    }
+
+    console.log('[auth.js] ✅ Auth bootstrap complete');
+
+  } catch (err) {
+    console.error('[auth.js] ✗ Uncaught error in bootstrap:', err);
+    clearToken();
+    redirectToLogin();
+  }
+})();
