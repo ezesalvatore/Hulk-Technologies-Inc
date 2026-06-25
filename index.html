@@ -27,6 +27,23 @@
   </div> <!-- /.wrap — FIX: this was missing, causing layout breakage -->
 </header>
 
+<section id="partners" style="padding-top:20px">
+  <div class="wrap">
+    <div class="partners">
+      <div class="sec-head">
+        <span class="kicker">Powered By</span>
+        <h2>Our business partners</h2>
+        <p>The trusted brands behind every device in our fleet — ready to deploy on demand.</p>
+      </div>
+      <div class="marquee">
+        <div class="marquee-track" id="partnerTrack">
+          <!-- logos injected by the inline script below (duplicated for a seamless loop) -->
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="catalog">
   <div class="wrap">
     <div id="catalogGrid">
@@ -78,6 +95,57 @@
     </div>
   </div>
 </section>
+
+
+
+<!-- Business partners carousel — self-contained, no APP_CONFIG dependency -->
+<script>
+(function () {
+  var partners = [
+    { name: 'Dell',     slug: 'dell' },
+    { name: 'HP',       slug: 'hp' },
+    { name: 'Lenovo',   slug: 'lenovo' },
+    { name: 'Cisco',    slug: 'cisco' },
+    { name: 'Intel',    slug: 'intel' },
+    { name: 'NVIDIA',   slug: 'nvidia' },
+    { name: 'AMD',      slug: 'amd' },
+    { name: 'Samsung',  slug: 'samsung' },
+    { name: 'ASUS',     slug: 'asus' },
+    { name: 'Acer',     slug: 'acer' },
+    { name: 'Logitech', slug: 'logitech' },
+    { name: 'Razer',    slug: 'razer' }
+  ];
+
+  var track = document.getElementById('partnerTrack');
+  if (!track) return;
+
+  function makeCell(p) {
+    var cell = document.createElement('div');
+    cell.className = 'plogo';
+
+    var img = document.createElement('img');
+    img.loading = 'lazy';
+    img.alt = p.name + ' logo';
+    img.src = 'https://cdn.simpleicons.org/' + p.slug + '/16221A';
+
+    // If the logo can't be fetched, fall back to a clean text label
+    img.onerror = function () {
+      var span = document.createElement('span');
+      span.className = 'pfallback';
+      span.textContent = p.name;
+      if (img.parentNode === cell) cell.replaceChild(span, img);
+    };
+
+    cell.appendChild(img);
+    return cell;
+  }
+
+  // Append the full set twice so the -50% scroll animation loops seamlessly
+  for (var copy = 0; copy < 2; copy++) {
+    partners.forEach(function (p) { track.appendChild(makeCell(p)); });
+  }
+})();
+</script>
 
 <section id="mission" style="padding-top:20px">
   <div class="wrap">
