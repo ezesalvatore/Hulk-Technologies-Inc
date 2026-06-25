@@ -155,7 +155,7 @@ async function exchangeCodeForTokens(code) {
     console.log('[auth.js] Token claims:', {
       sub:        claims.sub,
       email:      claims.email,
-      given_name: claims.given_name,
+      given_name: claims.name,
       exp:        new Date(claims.exp * 1000).toISOString(),
       iss:        claims.iss,
       aud:        claims.aud,
