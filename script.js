@@ -92,6 +92,20 @@ function showCategories() {
   document.getElementById('catalogGrid').style.display = 'block';
 }
 
+function getUserEmail() {
+  try {
+    const params = new URLSearchParams(window.location.hash.substring(1));
+    const idToken = params.get('id_token') || sessionStorage.getItem('id_token');
+    if (idToken) {
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+      return payload.email || '2kfinest14@gmail.com';
+    }
+  } catch (e) {
+    console.warn('Could not extract email from token:', e);
+  }
+  return '2kfinest14@gmail.com';
+}
+
 async function reserve(equipmentId, btn) {
 
   btn.disabled = true;
@@ -104,9 +118,10 @@ async function reserve(equipmentId, btn) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        equipmentId: equipmentId
-      })
+     body: JSON.stringify({
+  equipmentId: equipmentId,
+  userEmail: getUserEmail()
+})
     });
 
     const result = await response.json();
