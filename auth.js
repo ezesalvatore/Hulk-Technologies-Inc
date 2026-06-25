@@ -170,7 +170,16 @@ async function exchangeCodeForTokens(code) {
 
     console.log('[auth.js] ✓ Token is valid and not expired');
 
-    const name = claims.given_name 'there';
+    // Prefer a real written name; if only an email exists, humanize it
+    // (e.g. "john.doe@x.com" → "John Doe") so we never greet with a raw email.
+    const nameFromEmail = claims.email
+      ? claims.email
+          .split('@')[0]
+          .replace(/[._-]+/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+      : null;
+
+    const name = claims.given_name || claims.name || nameFromEmail || 'there';
     console.log('[auth.js] Greeting user as:', name);
 
     const greetSpan = document.querySelector('.greet span');
