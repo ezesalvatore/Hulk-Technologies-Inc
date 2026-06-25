@@ -10,21 +10,9 @@ console.log('[script.js] loaded');
 console.log('[script.js] window.APP_CONFIG =', window.APP_CONFIG);
 
 if (!window.APP_CONFIG) {
-  console.error('[script.js] APP_CONFIG is undefined. Check these in order:');
-  console.error('  1. Open DevTools -> Network tab -> look for config.js');
-  console.error('     If it shows 404, config.js is not in the Amplify build artifacts');
-  console.error('  2. Check the Amplify build log -- did generate-config.js run?');
-  console.error('  3. Are all 5 env vars set in Amplify console -> Environment variables?');
-  throw new Error('[script.js] APP_CONFIG not defined -- see console errors above');
+  console.error('[script.js] APP_CONFIG is undefined.');
+  throw new Error('[script.js] APP_CONFIG not defined');
 }
-
-console.log('[script.js] APP_CONFIG loaded OK:', {
-  cognitoDomain:    window.APP_CONFIG.cognitoDomain    ? 'set' : 'empty',
-  clientId:         window.APP_CONFIG.clientId         ? 'set' : 'empty',
-  redirectUri:      window.APP_CONFIG.redirectUri      ? 'set' : 'empty',
-  listEquipmentUrl: window.APP_CONFIG.listEquipmentUrl ? 'set' : 'empty',
-  reserveUrl:       window.APP_CONFIG.reserveUrl       ? 'set' : 'empty',
-});
 
 const { listEquipmentUrl: LIST_EQUIPMENT_URL, reserveUrl: RESERVE_URL } = window.APP_CONFIG;
 
@@ -97,3 +85,51 @@ function getUserEmail() {
       const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
       const claims = JSON.parse(atob(base64));
       if (claims.email) return claims.email;
+    }
+  } catch (e) {
+    console.warn('Could not extract email from token:', e);
+  }
+  return '';
+}
+
+async function reserve(equipmentId, btn) {
+
+  btn.disabled = true;
+  btn.textContent = 'Reserving...';
+
+  try {
+
+    const response = await fetch(RESERVE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        equipmentId: equipmentId,
+        userEmail: getUserEmail()
+      })
+    });
+
+    const result = await response.json();
+
+    console.log(result);
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Reservation failed');
+    }
+
+    btn.classList.add('queued');
+    btn.textContent = 'Reserved';
+
+    alert('Reservation successful');
+
+  } catch (err) {
+
+    console.error(err);
+
+    btn.disabled = false;
+    btn.textContent = 'Reserve';
+
+    alert(err.message);
+  }
+}
