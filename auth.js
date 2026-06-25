@@ -170,7 +170,7 @@ async function exchangeCodeForTokens(code) {
 
     console.log('[auth.js] ✓ Token is valid and not expired');
 
-    const name = claims.given_name || claims.name || claims.email || 'there';
+    const name = claims.given_name 'there';
     console.log('[auth.js] Greeting user as:', name);
 
     const greetSpan = document.querySelector('.greet span');
